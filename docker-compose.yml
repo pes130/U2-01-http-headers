@@ -1,0 +1,17 @@
+version: '3.8'
+
+services:
+  ctf:
+    build: .
+    # Si ya has publicado tu imagen en un registro, puedes usar:
+    # image: tuusuario/ctf-http:1.0
+    ports:
+      - "${PORT:-8080}:80"
+    environment:
+      # Inyéctalo sólo si quieres probar localmente un flag "final":
+      # (En despliegue real, mejor borrar esta línea y usar env/file sólo en OpenStack)
+      - FLAG=${FLAG:-}
+    # Montaje opcional del flag desde un fichero del host:
+    # volumes:
+    #   - ./flags/alumno.txt:/run/flag.txt:ro
+    restart: unless-stopped

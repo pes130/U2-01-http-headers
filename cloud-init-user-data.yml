@@ -1,0 +1,31 @@
+#cloud-config
+package_update: true
+final_message: "CTF container started"
+
+write_files:
+  - path: /root/bootstrap.sh
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+
+      # Instalar Docker (script oficial)
+      curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+      sh /tmp/get-docker.sh
+
+      # (Opcional) login a un registry privado:
+      # echo "${DOCKER_PASS}" | docker login -u "${DOCKER_USER}" --password-stdin registry.example.com
+
+      # Flag único inyectado desde cloud-init:
+      FLAG_VALUE="{{FLAG}}"
+
+      # Arrancar el contenedor del CTF (imagen sin flags)
+      docker run -d --name ctf-http -p 80:80 \
+        -e FLAG="${FLAG_VALUE}" \
+        tuusuario/ctf-http:1.0
+
+      # Guardar logs en archivo (opcional)
+      (docker logs -f ctf-http > /var/log/ctf-http.log 2>&1) &
+
+runcmd:
+  - [ bash, -lc, "/root/bootstrap.sh" ]
