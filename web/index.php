@@ -1,72 +1,110 @@
 <?php
-// La “bandera” se obtiene en este orden:
-//  1) variable de entorno FLAG
-//  2) contenido del fichero /run/flag.txt (si existe)
-//  3) (opcional) valor por defecto nulo
-
+// --- Helpers ---
 function get_env_flag() {
     $envFlag = getenv('FLAG');
-    if (!empty($envFlag)) return trim($envFlag);
-    $file = '/run/flag.txt';
-    if (is_readable($file)) {
-        $val = trim(@file_get_contents($file));
-        if ($val !== '') return $val;
-    }
     return null;
 }
 
 function header_val($name) {
+    // Intenta acceso por $_SERVER y por getallheaders()
     $key = 'HTTP_' . strtoupper(str_replace('-', '_', $name));
     if (isset($_SERVER[$key])) return $_SERVER[$key];
     if (function_exists('getallheaders')) {
         $h = getallheaders();
-        if (isset($h[$name])) return $h[$name];
+        // getallheaders puede devolver claves con diferente capitalización
+        foreach ($h as $k => $v) {
+            if (strcasecmp($k, $name) === 0) return $v;
+        }
     }
     return null;
 }
 
-// Cabeceras útiles
-$host         = $_SERVER['HTTP_HOST']           ?? '';
-$acceptLang   = $_SERVER['HTTP_ACCEPT_LANGUAGE']?? '';
-$userAgent    = $_SERVER['HTTP_USER_AGENT']     ?? '';
-$xSecret      = header_val('X-Secret-Header')   ?? '';
-$cookieFlag   = $_COOKIE['ctf_flag']            ?? '';
-$flag         = get_env_flag(); // Se inyecta por Docker/Cloud-init
+// --- Lectura de cabeceras / cookie / flag ---
+$host       = $_SERVER['HTTP_HOST']              ?? '';
+$acceptLang = $_SERVER['HTTP_ACCEPT_LANGUAGE']   ?? '';
+$userAgent  = $_SERVER['HTTP_USER_AGENT']        ?? '';
+$xSecret    = header_val('X-Secret-Header')      ?? '';
+$cookieFlag = $_COOKIE['ctf_flag']               ?? '';
+$flag       = get_env_flag(); // null si no hay
 
-// Reglas 
-$found = null;
+// --- Comprobaciones requeridas ---
+$host_found = ($host === 'iescelia.local');
 
-if (stripos($host, 'ctf.local') !== false && stripos($acceptLang, 'es') !== false) {
-    $found = "FLAG{ctf_host_lang_es}";
-}
-if (!$found && stripos($userAgent, 'MyCTFAgent/1.0') !== false && $xSecret === 'abracadabra') {
-    $found = "FLAG{useragent_and_secret}";
-}
-if (!$found && $cookieFlag === 'open-sesame') {
-    $found = "FLAG{cookie_success}";
-}
-if (!$found && stripos($host, 'admin.ctf.local') !== false && strpos($acceptLang, 'en') !== false && $xSecret === '42') {
-    $found = "FLAG{admin_combo_42}";
+$language_found = false;
+if (!empty($acceptLang)) {
+    // accept-language puede ser: "bn", "bn-BD, en;q=0.9", etc.
+    // Buscamos 'bn' como substring (insensible a mayúsculas)
+    $language_found = (stripos($acceptLang, 'bn') !== false);
 }
 
-// Si has inyectado un FLAG “oficial” por env/archivo, opcionalmente puedes revelarlo
-// al cumplir una condición especial para el reto final:
-if (!$found && $flag && stripos($userAgent, 'FinalAgent/2.0') !== false) {
-    $found = $flag;
+$user_agent_found = false;
+if (!empty($userAgent)) {
+    // Aceptamos user-agents que contengan PSP o la cadena clásica de PSP
+    // Ejemplo que tú pusiste: "Mozilla/4.0 (PSP (PlayStation Portable); 2.00)"
+    if (stripos($userAgent, 'Mozilla/4.0 (PSP (PlayStation Portable') !== false) {
+        $user_agent_found = true;
+    }
 }
 
-header('X-CTF-Hint: Modifica Host, Accept-Language, User-Agent, X-Secret-Header o Cookie ctf_flag');
+// --- Lógica principal ---
+$all_three = $host_found && $language_found && $user_agent_found;
 
-if ($found) {
+// Si ya tienen la cookie de flag válida, mostramos el flag en texto plano (solo para comprobación local)
+// Nota: si prefieres no mostrarlo nunca, comenta el bloque siguiente.
+if (!empty($cookieFlag)) {
     header('Content-Type: text/plain; charset=utf-8');
-    echo "¡Enhorabuena! Flag: {$found}\n";
-} else {
-    header('Content-Type: text/html; charset=utf-8');
-    echo "<h1>CTF HTTP — Cabeceras</h1>";
-    echo "<p>Prueba a modificar cabeceras como <code>Host</code>, <code>Accept-Language</code>, <code>User-Agent</code>, <code>X-Secret-Header</code> o la cookie <code>ctf_flag</code>.</p>";
-    echo "<ul>";
-    echo "<li>curl -H 'Host: ctf.local' -H 'Accept-Language: es' http://localhost:8080/</li>";
-    echo "<li>curl -H 'User-Agent: MyCTFAgent/1.0' -H 'X-Secret-Header: abracadabra' http://localhost:8080/</li>";
-    echo "<li>curl --cookie 'ctf_flag=open-sesame' http://localhost:8080/</li>";
-    echo "</ul>";
+    echo "Tienes la cookie ctf_flag establecida. Valor (cookie): " . htmlspecialchars($cookieFlag, ENT_QUOTES|ENT_SUBSTITUTE) . "\n";
+    exit;
 }
+
+// Si todas las condiciones base se cumplen, damos la pista por cabecera
+if ($all_three) {
+    header('X-HINT: Envía X-Secret-Header con el número de hijos legítimos de Julio Iglesias. Si aciertas, recibirás el flag en una cookie.');
+    // comprobamos si han enviado X-Secret-Header
+    if ($xSecret !== '') {
+        $expected = '8';
+        if (trim($xSecret) === $expected) {
+            $to_set = $flag;
+            // Establece cookie segura (HttpOnly). Ajusta 'secure' => true si usas HTTPS.
+            setcookie('ctf_flag', $to_set, [
+                'expires' => time() + 3600, // 1 hora
+                'path' => '/',
+                'httponly' => true,
+                'samesite' => 'Lax',
+            ]);
+            // Responder informando que se ha establecido la cookie (no revelar el flag en el body)
+            header('Content-Type: text/plain; charset=utf-8');
+            echo "Correcto. Cookie 'ctf_flag' establecida. Revisa las cookies del navegador o haz otra petición para comprobarla.\n";
+            exit;
+        } else {
+            // X-Secret-Header erróneo
+            header('Content-Type: text/plain; charset=utf-8', true, 403);
+            echo "X-Secret-Header incorrecto. Vuelve a intentarlo.\n";
+            exit;
+        }
+    } else {
+        // Sólo devolvemos la pista en cabecera y una página ligera indicando que envíen la cabecera
+        header('Content-Type: text/html; charset=utf-8');
+        echo "<h1>CTF HTTP — paso 1 completado</h1>";
+        echo "<p>Has proporcionado Host, Accept-Language (bn) y un User-Agent de PSP. Examina la cabecera de respuesta X-HINT para obtener la última pista</p>";
+        echo "<p>Hint visual: Bengali + PSP + iescelia.local.</p>";
+        exit;
+    }
+}
+
+// Si no han cumplido las tres condiciones primarias
+header('Content-Type: text/html; charset=utf-8');
+echo "<h1>CTF HTTP — Cabeceras</h1>";
+echo "<p>Sólo usuarios conectados al host <strong>iescelia.local</strong>, con <strong>Accept-Language</strong> en <em>bengalí</em> (bn) y desde una <strong>PSP (PlayStation Portable)</strong> recibirán una pista.</p>";
+
+echo "<ul>";
+echo "<li>Host: " . htmlspecialchars($host ?: '(no enviado)', ENT_QUOTES|ENT_SUBSTITUTE) . " " . ($host_found ? "<strong>OK</strong>" : "<em>faltante</em>") . "</li>";
+echo "<li>Accept-Language: " . htmlspecialchars($acceptLang ?: '(no enviado)', ENT_QUOTES|ENT_SUBSTITUTE) . " " . ($language_found ? "<strong>OK</strong>" : "<em>faltante</em>") . "</li>";
+echo "<li>User-Agent: " . htmlspecialchars($userAgent ?: '(no enviado)', ENT_QUOTES|ENT_SUBSTITUTE) . " " . ($user_agent_found ? "<strong>OK</strong>" : "<em>faltante</em>") . "</li>";
+echo "</ul>";
+
+echo "<p>Pruebas rápidas con <code>curl</code> (local):</p>";
+echo "<pre>";
+echo "curl -v -H \"Host: iescelia.local\" -H \"Accept-Language: bn\" -H \"User-Agent: 'Mozilla/4.0 (PSP (PlayStation Portable); 2.00)'\" http://localhost:8080/\n";
+echo "curl -v -H \"Host: iescelia.local\" -H \"Accept-Language: bn\" -H \"User-Agent: 'Mozilla/4.0 (PSP (PlayStation Portable); 2.00)'\" -H \"X-Secret-Header: 8\" http://localhost:8080/\n";
+echo "</pre>";
