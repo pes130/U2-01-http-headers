@@ -2,7 +2,8 @@
 // --- Helpers ---
 function get_env_flag() {
     $envFlag = getenv('FLAG');
-    return null;
+    if (!empty($envFlag)) 
+        return trim($envFlag);
 }
 
 function header_val($name) {
