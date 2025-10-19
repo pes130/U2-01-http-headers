@@ -60,7 +60,7 @@ if (!empty($cookieFlag)) {
 
 // Si todas las condiciones base se cumplen, damos la pista por cabecera
 if ($all_three) {
-    header('X-HINT: Envía X-Secret-Header con el número de hijos legítimos de Julio Iglesias. Si aciertas, recibirás el flag en una cookie.');
+    header('X-HINT: Envía cabecera X-Secret-Header con el número de hijos legítimos de Julio Iglesias. Si aciertas, recibirás el flag en una cookie.');
     // comprobamos si han enviado X-Secret-Header
     if ($xSecret !== '') {
         $expected = '8';
@@ -96,7 +96,9 @@ if ($all_three) {
 // Si no han cumplido las tres condiciones primarias
 header('Content-Type: text/html; charset=utf-8');
 echo "<h1>CTF HTTP — Cabeceras</h1>";
-echo "<p>Sólo usuarios conectados al host <strong>iescelia.local</strong>, con <strong>Accept-Language</strong> en <em>bengalí</em> (bn) y desde una <strong>PSP (PlayStation Portable)</strong> recibirán una pista.</p>";
+echo "<p>Sólo personas que hablen bengali y se conecten al host iescelia.local desde su Playstation Portable, estarán cerca de conocer la verdad</p>"; 
+echo "<img src='img/Geographic_distribution_of_Bengali_language.png' width='600px'><br>"; 
+echo "<img src='img/Sony-PSP-1000-Body.png' width='600px'>";
 
 echo "<ul>";
 echo "<li>Host: " . htmlspecialchars($host ?: '(no enviado)', ENT_QUOTES|ENT_SUBSTITUTE) . " " . ($host_found ? "<strong>OK</strong>" : "<em>faltante</em>") . "</li>";
