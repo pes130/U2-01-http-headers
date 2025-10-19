@@ -106,8 +106,4 @@ echo "<li>Accept-Language: " . htmlspecialchars($acceptLang ?: '(no enviado)', E
 echo "<li>User-Agent: " . htmlspecialchars($userAgent ?: '(no enviado)', ENT_QUOTES|ENT_SUBSTITUTE) . " " . ($user_agent_found ? "<strong>OK</strong>" : "<em>faltante</em>") . "</li>";
 echo "</ul>";
 
-echo "<p>Pruebas rápidas con <code>curl</code> (local):</p>";
-echo "<pre>";
-echo "curl -v -H \"Host: iescelia.local\" -H \"Accept-Language: bn\" -H \"User-Agent: 'Mozilla/4.0 (PSP (PlayStation Portable); 2.00)'\" http://localhost:8080/\n";
-echo "curl -v -H \"Host: iescelia.local\" -H \"Accept-Language: bn\" -H \"User-Agent: 'Mozilla/4.0 (PSP (PlayStation Portable); 2.00)'\" -H \"X-Secret-Header: 8\" http://localhost:8080/\n";
-echo "</pre>";
+
